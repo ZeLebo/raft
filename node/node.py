@@ -1,5 +1,6 @@
 import asyncio
 import sys
+import traceback
 from asyncio import sleep, StreamReader, StreamWriter, Event
 from typing import Dict
 from node.address import Address
@@ -122,7 +123,8 @@ class Node:
     async def handle_connection(self, reader: StreamReader, writer: StreamWriter):
         peer = writer.get_extra_info('peername')
         ip, port = peer[0], peer[1]
-        print(f"New connection from {ip}:{port}")
+        key = Address(ip, port)
+        print(f"New connection from {key=}")
         self.connections[Address(ip, port)] = Connection(reader, writer)
 
     async def handle_disconnection(self, addr: Address):
@@ -190,13 +192,15 @@ class Node:
         print(f"Received request vote {message}")
         try:
             await self.timer.reset()
-            if self.role == Role.FOLLOWER or self.role == Role.CANDIDATE:
+            if self.role == Role.FOLLOWER:
                 await self.send_message(message.candidate_id, RequestVoteResponse(self.term, True))
                 self.voted_for = message.candidate_id
             else:
                 await self.send_message(message.candidate_id, RequestVoteResponse(self.term, False))
-        except Exception as e:
-            print(f"Exception on request vote {e}")
+        except:
+            import sys
+            print("========================HUI===============================")
+            traceback.print_exception(*sys.exc_info())
 
     async def on_request_vote_response(self, message: RequestVoteResponse):
         print(f"Received request vote response {message}")
@@ -235,10 +239,8 @@ class Node:
         await self.timer.reset()
 
     async def send_message(self, addr: Address, message):
-        await self.mutex.acquire()
         conn = self.connections[addr]
         await conn.send(message)
-        self.mutex.release()
 
     async def leader_behaviour(self):
         print(f"Leader behaviour")
